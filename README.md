@@ -21,3 +21,10 @@ evaluation on a grid is a single vectorised loop.
 - Gold isosurface  at  ψ = −isovalue
 - Grey cylinder    for every inferred bond
 - CPK sphere       for every atom (Scatter3d)
+
+Installation
+------------
+
+    >> git clone git@github.com:AleksandraLeszczyk/ElectronCloud.git
+    >> cd ElectronCloud
+    >> pip install .
