@@ -2,7 +2,7 @@
 
 Visualise Molecules and Molecular Orbitals (MOs) with Python.
 
-[<img width="548" height="132" alt="image" src="https://github.com/user-attachments/assets/143345a6-e07b-45e5-836a-d8a55c1332c4" />](https://aleksandraleszczyk.github.io/ElectronCloud/examples/ethylene_mo6_rhf.html)
+[<img width="870" height="212" alt="image" src="https://github.com/user-attachments/assets/2b398e11-624d-41cc-84e1-aab6d41798fd" />](https://aleksandraleszczyk.github.io/ElectronCloud/examples/ethylene_mo6_rhf.html)
 
 Architecture
 ------------
