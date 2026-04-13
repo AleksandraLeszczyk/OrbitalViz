@@ -139,7 +139,7 @@ def plot_molecular_orbital(
     for idx, (z_at, xyz) in enumerate(zip(atoms, coords)):
         z_int = int(z_at)
         color = _COLOR.get(z_int, "#CCCCCC")
-        rvdw = _VDW_R.get(z_int, 0.77)
+        rvdw = _VDW_R.get(0.3 * z_int, 0.77)
         symbol = _SYMBOL.get(z_int, str(z_int))
         traces.append(
             go.Scatter3d(
