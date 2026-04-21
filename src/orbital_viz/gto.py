@@ -5,7 +5,7 @@ from typing import Any, List, Tuple, Self
 import numpy as np
 
 from orbital_viz.parser_molden import parse_molden_to_dict
-from orbital_viz.utils import _CART, _prim_norm, _SYMBOL
+from orbital_viz.utils import _CART, prim_norm, _SYMBOL, prim_norm_sph, real_solid_harmonic
 
 
 class BasisGTO:
@@ -75,12 +75,14 @@ class BasisGTO:
         alpha: List[float],
         shell_types: List[int],
         shell_to_atom: List[int],
+        spherical: bool = False,
     ):
 
         self.atoms = np.asarray(atoms, dtype=int)
         self.coordinates = np.asarray(coordinates, dtype=float)  # (N_at, 3) Å
         self.n_atoms = int(self.atoms.size)
-
+        
+        self.spherical = spherical
         number_of_primitives = number_of_primitives
         self.shell_types = shell_types
         shell_to_atom = shell_to_atom
@@ -102,6 +104,7 @@ class BasisGTO:
         # Internal per-AO storage (indexed by AO function index 0…n_basis-1)
         self._centers: list[np.ndarray] = []  # (3,)
         self._lxlylz: list[Tuple[int, int, int]] = []
+        self._lm:     list = []            # (l, m)     or None
         self._alphas: list[np.ndarray] = []  # (K,)  exponents
         self._nc: list[np.ndarray] = []  # (K,)  norm × coeff
 
@@ -117,12 +120,21 @@ class BasisGTO:
             coeffs = c_arr[ptr : ptr + n_prim]
             ptr += n_prim
 
-            for lx, ly, lz in _CART.get(l, [(0, 0, 0)]):
-                norms = np.array([_prim_norm(a, lx, ly, lz) for a in alphas])
-                self._centers.append(center.copy())
-                self._lxlylz.append((lx, ly, lz))
-                self._alphas.append(alphas.copy())
-                self._nc.append(norms * coeffs)
+            if spherical:
+                for m in range(-l, l + 1):
+                    norms = np.array([prim_norm_sph(a, l) for a in alphas])
+                    self._centers.append(center.copy())
+                    self._lxlylz.append(None)           # unused in spherical mode
+                    self._lm.append((l, m))
+                    self._alphas.append(alphas.copy())
+                    self._nc.append(norms * coeffs)
+            else:
+                for lx, ly, lz in _CART.get(l, [(0, 0, 0)]):
+                    norms = np.array([prim_norm(a, lx, ly, lz) for a in alphas])
+                    self._centers.append(center.copy())
+                    self._lxlylz.append((lx, ly, lz))
+                    self._alphas.append(alphas.copy())
+                    self._nc.append(norms * coeffs)
 
         self.n_basis = len(self._centers)
 
@@ -141,6 +153,7 @@ class BasisGTO:
             alpha=basis.alpha,
             shell_types=basis.shell_types,
             shell_to_atom=basis.shell2atom,
+            spherical=True,
         )
 
     @classmethod
@@ -148,7 +161,7 @@ class BasisGTO:
         cls,
         filepath: str,
     ) -> Self:
-        return cls(**parse_molden_to_dict(filepath))
+        return cls(**parse_molden_to_dict(filepath), spherical=True)
 
 
     # ── repr ──────────────────────────────────────────────────────────────
@@ -162,35 +175,27 @@ class BasisGTO:
 
     # ── low-level evaluation ──────────────────────────────────────────────
 
-    def _eval_ao(
-        self,
-        idx: int,
-        xf: np.ndarray,  # shape (N,), ravelled grid
-        yf: np.ndarray,
-        zf: np.ndarray,
-    ) -> np.ndarray:
-        """Evaluate a single contracted AO on flat coordinate arrays."""
+    def _eval_ao(self, idx, xf, yf, zf):
         cx, cy, cz = self._centers[idx]
-        lx, ly, lz = self._lxlylz[idx]
         dx, dy, dz = xf - cx, yf - cy, zf - cz
-        r2 = dx * dx + dy * dy + dz * dz
-
-        # Radial part: sum_k  (norm_k × coeff_k) × exp(−alpha_k × r²)
-        # Shape trick: outer product → (K, N) then sum over K
+        r2 = dx*dx + dy*dy + dz*dz
         radial = np.dot(self._nc[idx], np.exp(np.outer(-self._alphas[idx], r2)))
 
-        # Angular part: x^lx y^ly z^lz  (skipped for s-functions)
-        l = lx + ly + lz
-        if l == 0:
-            return radial
-        angular = np.ones_like(dx)
-        if lx:
-            angular = angular * dx**lx
-        if ly:
-            angular = angular * dy**ly
-        if lz:
-            angular = angular * dz**lz
-        return angular * radial
+        if self.spherical:                               # ← NEW BRANCH
+            l, m = self._lm[idx]
+            if l == 0:
+                return radial
+            return real_solid_harmonic(l, m, dx, dy, dz) * radial
+        else:                                            # original Cartesian path
+            lx, ly, lz = self._lxlylz[idx]
+            l = lx + ly + lz
+            if l == 0:
+                return radial
+            angular = np.ones_like(dx)
+            if lx: angular = angular * dx**lx
+            if ly: angular = angular * dy**ly
+            if lz: angular = angular * dz**lz
+            return angular * radial
 
     # ── public evaluation API ─────────────────────────────────────────────
 

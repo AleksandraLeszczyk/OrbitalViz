@@ -219,7 +219,7 @@ def _dfact(n: int) -> int:
     return r
 
 
-def _prim_norm(alpha: float, lx: int, ly: int, lz: int) -> float:
+def prim_norm(alpha: float, lx: int, ly: int, lz: int) -> float:
     """
     Normalisation constant  N  such that
 
@@ -235,12 +235,57 @@ def _prim_norm(alpha: float, lx: int, ly: int, lz: int) -> float:
     N2 /= _dfact(2 * lx - 1) * _dfact(2 * ly - 1) * _dfact(2 * lz - 1)
     return math.sqrt(N2)
 
+import math
+
+
+def prim_norm_sph(alpha: float, l: int) -> float:
+    """Normalization for a primitive spherical GTO (regular solid harmonic convention)."""
+    double_fact = 1  # (2l-1)!!  with (-1)!! = 1 by convention
+    for k in range(1, 2 * l, 2):
+        double_fact *= k
+    return math.sqrt(
+        (2 ** l) * (2 * alpha) ** (l + 1.5) / (math.pi ** 1.5 * double_fact)
+    )
+
+
+def real_solid_harmonic(
+    l: int, m: int,
+    dx: np.ndarray, dy: np.ndarray, dz: np.ndarray,
+) -> np.ndarray:
+    """
+    Real regular solid harmonic R_l^m(dx, dy, dz) = sqrt(4π/(2l+1)) * r^l * Y_l^m.
+    A degree-l homogeneous polynomial — the spherical analogue of x^lx y^ly z^lz.
+    m ordering: -l, -l+1, ..., l-1, l  (matches Gaussian / ORCA / molden convention).
+    """
+    x, y, z = dx, dy, dz
+    if l == 0:
+        return np.ones_like(x)
+    if l == 1:
+        if m == -1: return y.copy()
+        if m ==  0: return z.copy()
+        if m ==  1: return x.copy()
+    if l == 2:
+        if m == -2: return np.sqrt(3.0) * x * y
+        if m == -1: return np.sqrt(3.0) * y * z
+        if m ==  0: return 0.5 * (2*z*z - x*x - y*y)
+        if m ==  1: return np.sqrt(3.0) * x * z
+        if m ==  2: return (np.sqrt(3.0) / 2) * (x*x - y*y)
+    if l == 3:
+        if m == -3: return (np.sqrt(10.0) / 4) * y * (3*x*x - y*y)
+        if m == -2: return np.sqrt(15.0) * x * y * z
+        if m == -1: return (np.sqrt(6.0)  / 4) * y * (4*z*z - x*x - y*y)
+        if m ==  0: return 0.5 * z * (2*z*z - 3*x*x - 3*y*y)
+        if m ==  1: return (np.sqrt(6.0)  / 4) * x * (4*z*z - x*x - y*y)
+        if m ==  2: return (np.sqrt(15.0) / 2) * (x*x - y*y) * z
+        if m ==  3: return (np.sqrt(10.0) / 4) * x * (x*x - 3*y*y)
+    raise NotImplementedError(f"Solid harmonic l={l}, m={m} not implemented (max l=3)")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3.  Geometry helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _find_bonds(
+def find_bonds(
     coords: np.ndarray,
     atoms: np.ndarray,
     factor: float = 1.8,
@@ -261,7 +306,7 @@ def _find_bonds(
     return bonds
 
 
-def _cylinder_mesh(
+def cylinder_mesh(
     p1: np.ndarray,
     p2: np.ndarray,
     radius: float = 0.08,

@@ -6,7 +6,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from orbital_viz.gto import BasisGTO
-from orbital_viz.utils import _COLOR, _SYMBOL, _VDW_R, _cylinder_mesh, _find_bonds, get_sphere_coords
+from orbital_viz.utils import _COLOR, _SYMBOL, _VDW_R, cylinder_mesh, find_bonds, get_sphere_coords
 
 def plot_molecular_orbital(
     Basis: BasisGTO,
@@ -114,8 +114,8 @@ def plot_molecular_orbital(
     ]
 
     # ── 4. Bond sticks (Mesh3d cylinders) ──────────────────────────────────
-    for i, j in _find_bonds(coords, atoms):
-        xc, yc, zc, ti, tj, tk = _cylinder_mesh(
+    for i, j in find_bonds(coords, atoms):
+        xc, yc, zc, ti, tj, tk = cylinder_mesh(
             coords[i], coords[j], radius=bond_radius
         )
         traces.append(
