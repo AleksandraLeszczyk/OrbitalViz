@@ -24,6 +24,6 @@ evaluation on a grid is a single vectorised loop.
 Installation
 ------------
 
-    >> git clone git@github.com:AleksandraLeszczyk/ElectronCloud.git
-    >> cd ElectronCloud
+    >> git clone git@github.com:AleksandraLeszczyk/OrbitalViz.git
+    >> cd OrbitalViz
     >> pip install .
