@@ -2,9 +2,7 @@
 
 Visualise molecules and molecular orbitals (MOs) interactively in Python.
 
-[<img width="870" height="212" alt="image" src="https://github.com/user-attachments/assets/2b398e11-624d-41cc-84e1-aab6d41798fd" />](https://aleksandraleszczyk.github.io/ElectronCloud/examples/ethylene_mo6_rhf.html)
-
-> Click the image to open a live interactive example.
+<img width="813" height="245" alt="obraz" src="https://github.com/user-attachments/assets/7f0d0eeb-e7f8-4a0a-91a6-62b78d906356" />
 
 ---
 
