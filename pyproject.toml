@@ -7,7 +7,18 @@ name = "orbital_viz"
 version = "0.1.0"
 description = "Visualization tool for molecular electronic structures."
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Intended Audience :: Science/Research",
+]
 authors = [
     { name = "Aleksandra Leszczyk", email = "al.leszczyk@gmail.com" }
 ]
