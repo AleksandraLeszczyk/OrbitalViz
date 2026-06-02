@@ -7,7 +7,7 @@ name = "orbital_viz"
 version = "0.1.0"
 description = "Visualization tool for molecular electronic structures."
 readme = "README.md"
-requires-python = "==3.12"
+requires-python = ">=3.12"
 authors = [
     { name = "Aleksandra Leszczyk", email = "al.leszczyk@gmail.com" }
 ]

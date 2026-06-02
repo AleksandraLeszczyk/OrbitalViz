@@ -235,9 +235,6 @@ def prim_norm(alpha: float, lx: int, ly: int, lz: int) -> float:
     N2 /= _dfact(2 * lx - 1) * _dfact(2 * ly - 1) * _dfact(2 * lz - 1)
     return math.sqrt(N2)
 
-import math
-
-
 def prim_norm_sph(alpha: float, l: int) -> float:
     """Normalization for a primitive spherical GTO (regular solid harmonic convention)."""
     double_fact = 1  # (2l-1)!!  with (-1)!! = 1 by convention
@@ -282,7 +279,47 @@ def real_solid_harmonic(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3.  Geometry helpers
+# 3.  Cartesian ↔ spherical transformation matrices
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_l_transformation(l: int) -> np.ndarray:
+    """
+    Transformation matrix T of shape ``(2l+1, N_cart)`` that maps Cartesian
+    GTO components to real solid-harmonic (spherical) components for angular
+    momentum *l*.
+
+    Cartesian column order follows ``_CART[l]``; spherical row order is
+    m = −l, −l+1, …, l−1, l  (Gaussian / ORCA / Molden convention).
+    """
+    if l == 0:
+        return np.array([[1.0]])
+    if l == 1:
+        return np.eye(3)
+    if l == 2:
+        rt3 = math.sqrt(3.0)
+        T = np.zeros((5, 6))
+        T[0, 3] = 1.0                                 # dxy   (1,1,0)
+        T[1, 5] = 1.0                                 # dyz   (0,1,1)
+        T[2, 0], T[2, 1], T[2, 2] = -0.5, -0.5, 1.0  # dz2
+        T[3, 4] = 1.0                                 # dxz   (1,0,1)
+        T[4, 0], T[4, 1] = 0.5 * rt3, -0.5 * rt3     # dx2-y2
+        return T
+    if l == 3:
+        rt3, rt5 = math.sqrt(3.0), math.sqrt(5.0)
+        T = np.zeros((7, 10))
+        T[3, 2], T[3, 4], T[3, 6] = 1.0, -1.5, -1.5            # m= 0: fz3
+        T[4, 7], T[4, 0], T[4, 5] = 1.0, -0.25, -0.25          # m=+1: fxz2
+        T[2, 8], T[2, 1], T[2, 3] = 1.0, -0.25, -0.25          # m=-1: fyz2
+        T[5, 4], T[5, 6] = 0.5 * rt3, -0.5 * rt3               # m=+2: fz(x2-y2)
+        T[1, 9] = 1.0                                            # m=-2: fxyz
+        T[6, 0], T[6, 5] = 0.25 * rt5 / rt3, -0.75 * rt5 / rt3 # m=+3: fx(x2-3y2)
+        T[0, 3], T[0, 1] = 0.75 * rt5 / rt3, -0.25 * rt5 / rt3 # m=-3: fy(3x2-y2)
+        return T
+    raise NotImplementedError(f"get_l_transformation: l={l} not implemented (max l=3)")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4.  Geometry helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
 def find_bonds(

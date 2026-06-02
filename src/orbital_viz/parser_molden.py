@@ -1,7 +1,8 @@
-import re
-from typing import Dict, List, Any
+from __future__ import annotations
 
-def parse_molden_to_dict(filepath: str) -> Dict[str, Any]:
+from typing import Any
+
+def parse_molden_to_dict(filepath: str) -> dict[str, Any]:
     """
     Parses a standard Molden file to extract atomic coordinates and basis set (GTO) details.
     
@@ -98,70 +99,3 @@ def parse_molden_to_dict(filepath: str) -> Dict[str, Any]:
                     data["contraction"].append(float(prim_parts[1]))
 
     return data
-
-import numpy as np
-
-
-def read_molden_c_matrix(filepath: str) -> np.ndarray:
-    """
-    Reads the AO/MO transformation matrix directly from a Molden file using pure Python and NumPy.
-    
-    Args:
-        filepath (str): Path to the .molden file.
-        
-    Returns:
-        np.ndarray: The transformation matrix C of shape (N_AO, N_MO).
-    """
-    mo_matrix = []
-    current_mo = []
-    in_mo_section = False
-
-    with open(filepath, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-
-            # Check if we are entering the MO section
-            if line.upper().startswith('[MO]'):
-                in_mo_section = True
-                continue
-
-            # If we hit another bracketed section, we are done with MOs
-            if line.startswith('['):
-                if in_mo_section:
-                    if current_mo:
-                        mo_matrix.append(current_mo)
-                    break
-
-            if in_mo_section:
-                # Metadata lines contain '=' or alphabetic characters (Sym=, Ene=, Alpha, etc.)
-                if '=' in line or line.isalpha():
-                    # If we already collected AOs for an MO, save it before starting the new one
-                    if current_mo:
-                        mo_matrix.append(current_mo)
-                        current_mo = []
-                    continue
-
-                # Parse the AO index and coefficient
-                parts = line.split()
-                if len(parts) == 2:
-                    try:
-                        # Molden often uses Fortran-style scientific notation (e.g., 0.123D-02)
-                        # We must convert 'D' or 'd' to 'E' for Python's float() to understand it.
-                        coeff_str = parts[1].replace('D', 'E').replace('d', 'e')
-                        coeff = float(coeff_str)
-                        current_mo.append(coeff)
-                    except ValueError:
-                        continue
-
-    # Catch the very last MO in the file
-    if current_mo:
-        mo_matrix.append(current_mo)
-
-    # mo_matrix is currently a list of MOs, meaning shape is (N_MO, N_AO).
-    # The standard quantum chemical convention for the C matrix is (N_AO, N_MO).
-    # We convert to a NumPy array and transpose it.
-    c_matrix = np.array(mo_matrix).T
-    
-    return c_matrix

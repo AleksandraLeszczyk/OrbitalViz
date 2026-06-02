@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Tuple, Self
+from typing import Any, Self
 
 import numpy as np
 
@@ -68,13 +68,13 @@ class BasisGTO:
     # ── construction ──────────────────────────────────────────────────────
     def __init__(
         self,
-        atoms: List[int],
-        coordinates: List[List[float]],
-        number_of_primitives: List[int],
-        contraction: List[float],
-        alpha: List[float],
-        shell_types: List[int],
-        shell_to_atom: List[int],
+        atoms: list[int],
+        coordinates: list[list[float]],
+        number_of_primitives: list[int],
+        contraction: list[float],
+        alpha: list[float],
+        shell_types: list[int],
+        shell_to_atom: list[int],
         spherical: bool = False,
     ):
 
@@ -83,9 +83,9 @@ class BasisGTO:
         self.n_atoms = int(self.atoms.size)
         
         self.spherical = spherical
-        number_of_primitives = number_of_primitives
+        self.number_of_primitives = number_of_primitives
         self.shell_types = shell_types
-        shell_to_atom = shell_to_atom
+        self.shell_to_atom = shell_to_atom
 
         a_arr = np.asarray(alpha, dtype=float)
         c_arr = np.asarray(contraction, dtype=float)
@@ -102,11 +102,11 @@ class BasisGTO:
             )
 
         # Internal per-AO storage (indexed by AO function index 0…n_basis-1)
-        self._centers: list[np.ndarray] = []  # (3,)
-        self._lxlylz: list[Tuple[int, int, int]] = []
-        self._lm:     list = []            # (l, m)     or None
-        self._alphas: list[np.ndarray] = []  # (K,)  exponents
-        self._nc: list[np.ndarray] = []  # (K,)  norm × coeff
+        self._centers: list[np.ndarray] = []                       # (3,)
+        self._lxlylz: list[tuple[int, int, int] | None] = []      # None in spherical mode
+        self._lm:     list[tuple[int, int] | None] = []            # None in Cartesian mode
+        self._alphas: list[np.ndarray] = []                        # (K,)  exponents
+        self._nc:     list[np.ndarray] = []                        # (K,)  norm × coeff
 
         ptr = 0  # pointer into the flat Alpha / contraction arrays
         for n_prim, l, at in zip(number_of_primitives, shell_types, shell_to_atom):
@@ -133,6 +133,7 @@ class BasisGTO:
                     norms = np.array([prim_norm(a, lx, ly, lz) for a in alphas])
                     self._centers.append(center.copy())
                     self._lxlylz.append((lx, ly, lz))
+                    self._lm.append(None)               # unused in Cartesian mode
                     self._alphas.append(alphas.copy())
                     self._nc.append(norms * coeffs)
 
