@@ -7,12 +7,15 @@ name = "orbital_viz"
 version = "0.1.0"
 description = "Visualization tool for molecular electronic structures."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
     { name = "Aleksandra Leszczyk", email = "al.leszczyk@gmail.com" }
 ]
 # Dynamically pulling from your requirements.txt
 dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
