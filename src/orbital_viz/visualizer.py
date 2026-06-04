@@ -8,6 +8,119 @@ import plotly.graph_objects as go
 from orbital_viz.gto import BasisGTO
 from orbital_viz.utils import _COLOR, _SYMBOL, _VDW_R, cylinder_mesh, find_bonds, get_sphere_coords
 
+# ── Camera angle helpers ───────────────────────────────────────────────────────
+
+_DEFAULT_EYE = dict(x=1.6, y=1.6, z=1.2)
+
+
+def _angles_to_eye(azimuth_deg: float, elevation_deg: float, r: float = 2.5) -> dict:
+    """Convert spherical (azimuth, elevation) angles in degrees to a Plotly camera eye dict."""
+    az = np.radians(azimuth_deg)
+    el = np.radians(elevation_deg)
+    return dict(
+        x=float(r * np.cos(el) * np.cos(az)),
+        y=float(r * np.cos(el) * np.sin(az)),
+        z=float(r * np.sin(el)),
+    )
+
+
+def _eye_to_angles(eye: dict) -> tuple[float, float]:
+    """Return (azimuth_deg, elevation_deg) from a Plotly camera eye dict."""
+    x, y, z = eye["x"], eye["y"], eye["z"]
+    r = np.sqrt(x**2 + y**2 + z**2)
+    elevation = float(np.degrees(np.arcsin(np.clip(z / r, -1.0, 1.0))))
+    azimuth = float(np.degrees(np.arctan2(y, x)))
+    return azimuth, elevation
+
+
+# ── HTML export with live angle overlay ───────────────────────────────────────
+
+_ANGLE_POST_SCRIPT = """
+(function() {
+    var gd = document.querySelector('.js-plotly-plot');
+    if (!gd) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'orbital-angle-overlay';
+    overlay.style.cssText = (
+        'position:absolute;bottom:8px;right:8px;padding:4px 10px;'
+        'font:13px monospace;border-radius:4px;pointer-events:none;z-index:9999;'
+        + '{OVERLAY_STYLE}'
+    );
+    overlay.textContent = 'Az: {AZ:.1f}°  El: {EL:.1f}°';
+    gd.style.position = 'relative';
+    gd.appendChild(overlay);
+
+    gd.on('plotly_relayout', function(ev) {
+        var cam = (ev['scene.camera'] || {}).eye
+               || ((gd._fullLayout || {}).scene || {})._camera && gd._fullLayout.scene._camera.eye;
+        if (!cam) {
+            var sceneCamera = (gd.layout && gd.layout.scene && gd.layout.scene.camera);
+            cam = sceneCamera && sceneCamera.eye;
+        }
+        if (!cam) return;
+        var r = Math.sqrt(cam.x*cam.x + cam.y*cam.y + cam.z*cam.z);
+        if (r < 1e-9) return;
+        var el = Math.asin(Math.max(-1, Math.min(1, cam.z / r))) * 180 / Math.PI;
+        var az = Math.atan2(cam.y, cam.x) * 180 / Math.PI;
+        overlay.textContent = 'Az: ' + az.toFixed(1) + '°  El: ' + el.toFixed(1) + '°';
+    });
+})();
+"""
+
+
+def figure_to_html(fig: go.Figure, *, show_live_angles: bool = True, **to_html_kwargs) -> str:
+    """
+    Serialise *fig* to a self-contained HTML string.
+
+    Parameters
+    ----------
+    fig : go.Figure
+        Figure produced by :func:`plot_molecular_orbital`.
+    show_live_angles : bool
+        When ``True`` (default) a floating overlay in the bottom-right corner
+        displays the current azimuth and elevation angles and updates in real
+        time as the user rotates the molecule.
+    **to_html_kwargs
+        Forwarded verbatim to :meth:`plotly.graph_objects.Figure.to_html`.
+
+    Returns
+    -------
+    str
+        Complete HTML document ready to save as ``.html`` or embed in a page.
+    """
+    if not show_live_angles:
+        return fig.to_html(**to_html_kwargs)
+
+    # Detect background colour from figure so the overlay blends in
+    bg = (fig.layout.paper_bgcolor or "#ffffff").lower()
+    dark = bg not in ("#ffffff", "white", "rgb(255,255,255)", "")
+    if dark:
+        overlay_style = "background:rgba(0,0,0,0.55);color:#ffffff;border:1px solid #555;"
+    else:
+        overlay_style = "background:rgba(255,255,255,0.75);color:#111111;border:1px solid #bbb;"
+
+    # Read the initial angles from the figure's camera
+    try:
+        eye = fig.layout.scene.camera.eye.to_plotly_json()
+    except (AttributeError, TypeError):
+        eye = _DEFAULT_EYE
+    az0, el0 = _eye_to_angles(eye)
+
+    post_script = (
+        _ANGLE_POST_SCRIPT
+        .replace("{OVERLAY_STYLE}", overlay_style)
+        .replace("{AZ:.1f}", f"{az0:.1f}")
+        .replace("{EL:.1f}", f"{el0:.1f}")
+    )
+
+    to_html_kwargs.setdefault("include_plotlyjs", "cdn")
+    to_html_kwargs.setdefault("full_html", True)
+    return fig.to_html(post_script=post_script, **to_html_kwargs)
+
+
+# ── Main plotting function ─────────────────────────────────────────────────────
+
 def plot_molecular_orbital(
     Basis: BasisGTO,
     mo_coeffs: np.ndarray,
@@ -22,6 +135,9 @@ def plot_molecular_orbital(
     title: Optional[str] = None,
     dark_bg: bool = False,
     show_labels: bool = True,
+    azimuth: Optional[float] = None,
+    elevation: Optional[float] = None,
+    show_rotation_angles: bool = False,
 ) -> go.Figure:
     """
     Render the *n*-th molecular orbital as an interactive Plotly 3-D figure.
@@ -55,12 +171,35 @@ def plot_molecular_orbital(
         Figure title.  Defaults to ``"MO #n"``.
     dark_bg : bool
         Dark background (great for glowing orbitals) or white.
+    azimuth : float | None
+        Initial camera azimuth angle in **degrees** (rotation in the x-y plane,
+        measured from the +x axis counter-clockwise).  When supplied together
+        with *elevation*, the molecule is shown from that viewpoint.
+        If only one of the two is given the other retains its default value
+        (≈ 45° azimuth, ≈ 28° elevation).
+    elevation : float | None
+        Initial camera elevation angle in **degrees** above the x-y plane.
+        Positive values look down on the molecule; negative values look up.
+    show_rotation_angles : bool
+        When ``True``, a static annotation in the figure corner shows the
+        current azimuth and elevation of the camera.  Automatically set to
+        ``True`` whenever *azimuth* or *elevation* is specified.
 
     Returns
     -------
     plotly.graph_objects.Figure
-        Call ``.show()`` in a Jupyter notebook cell to render it.
+        Call ``.show()`` in a Jupyter notebook cell to render it, or pass
+        the figure to :func:`figure_to_html` to obtain a self-contained HTML
+        file with a live angle overlay.
     """
+
+    # ── 0. Resolve camera angles ───────────────────────────────────────────────
+    _rotation_given = azimuth is not None or elevation is not None
+    _default_az, _default_el = _eye_to_angles(_DEFAULT_EYE)
+    _az = azimuth if azimuth is not None else _default_az
+    _el = elevation if elevation is not None else _default_el
+    camera_eye = _angles_to_eye(_az, _el) if _rotation_given else _DEFAULT_EYE
+    _show_angles = show_rotation_angles or _rotation_given
 
     coords = Basis.coordinates  # (N_at, 3) Å
     atoms = Basis.atoms
@@ -206,7 +345,7 @@ def plot_molecular_orbital(
             yaxis=_axis("y / Å"),
             zaxis=_axis("z / Å"),
             aspectmode="data",
-            camera=dict(eye=dict(x=1.6, y=1.6, z=1.2)),
+            camera=dict(eye=camera_eye),
         ),
         paper_bgcolor=bg,
         font=dict(color=tc),
@@ -220,4 +359,21 @@ def plot_molecular_orbital(
         ),
         margin=dict(l=0, r=0, t=60, b=0),
     )
+
+    if _show_angles:
+        fig.add_annotation(
+            text=f"Az: {_az:.1f}°  El: {_el:.1f}°",
+            xref="paper",
+            yref="paper",
+            x=0.99,
+            y=0.01,
+            xanchor="right",
+            yanchor="bottom",
+            showarrow=False,
+            font=dict(size=12, color=tc, family="monospace"),
+            bgcolor="rgba(0,0,0,0.45)" if dark_bg else "rgba(255,255,255,0.7)",
+            bordercolor=axc,
+            borderwidth=1,
+        )
+
     return fig

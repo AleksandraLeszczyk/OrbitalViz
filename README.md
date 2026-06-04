@@ -115,8 +115,32 @@ Renders MO `n` as an interactive Plotly 3-D figure.
 | `title` | `None` | Figure title; defaults to `"MO #n"` |
 | `dark_bg` | `False` | Dark background (great for glowing orbital renders) |
 | `show_labels` | `True` | Show atom labels |
+| `azimuth` | `None` | Initial camera azimuth in degrees (x-y plane, from +x axis) |
+| `elevation` | `None` | Initial camera elevation in degrees above the x-y plane |
+| `show_rotation_angles` | `False` | Show a static azimuth/elevation annotation in the figure corner |
 
 Returns a `plotly.graph_objects.Figure`. Call `.show()` to render in Jupyter or `.write_html("out.html")` to save.
+
+When `azimuth` or `elevation` is provided the angle annotation is shown automatically. The default view is equivalent to `azimuth=45, elevation=28`.
+
+---
+
+### `figure_to_html(fig, *, show_live_angles=True, **kwargs)`
+
+Converts a figure to a self-contained HTML string with an optional live angle overlay that updates as the user rotates the molecule.
+
+```python
+from orbital_viz import figure_to_html
+
+fig = plot_molecular_orbital(basis, C, n=5, azimuth=90, elevation=15)
+
+# Save as interactive HTML with live angle readout
+html = figure_to_html(fig)
+with open("orbital.html", "w") as f:
+    f.write(html)
+```
+
+The overlay displays `Az: …°  El: …°` in the bottom-right corner of the figure and refreshes on every camera move. Pass `show_live_angles=False` to disable it. Additional keyword arguments are forwarded to `plotly.graph_objects.Figure.to_html`.
 
 ---
 
